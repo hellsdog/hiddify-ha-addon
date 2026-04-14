@@ -655,7 +655,7 @@ HTML = r"""<!DOCTYPE html>
 
     <div class="label" style="margin-top:4px;margin-bottom:0">Profile</div>
     <div class="profile-row">
-      <select id="profile-sel"></select>
+      <select id="profile-sel" onchange="profileSelectionChanged()"></select>
       <button class="btn-switch" id="btn-switch" onclick="switchProfile()">Apply</button>
     </div>
     <div class="msg" id="msg"></div>
@@ -694,13 +694,24 @@ HTML = r"""<!DOCTYPE html>
     <div class="msg" id="server-msg"></div>
   </div>
 
-  <div class="footer">Updates every 2 s · Hiddify VPN 2.2.0</div>
+  <div class="footer">Updates every 2 s · Hiddify VPN 2.4.1</div>
 </div>
 
 <script>
 let _uptimeSec = 0;
 let _tick = null;
 let _profiles = [];
+let _profileDraftValue = "";
+let _profileSwitchPending = false;
+
+function profileOptionValue(p) {
+  return `${p.sub_id || ""}::${p.index}`;
+}
+
+function profileSelectionChanged() {
+  const sel = document.getElementById("profile-sel");
+  _profileDraftValue = sel ? sel.value : "";
+}
 
 function fmt(b) {
   if (!b) return "0 B";
@@ -723,16 +734,37 @@ function setMsg(id, t, ok=true) {
 }
 
 function updateProfiles(profiles) {
-  _profiles = profiles || [];
   const sel = document.getElementById("profile-sel");
+  const currentValue = sel ? sel.value : "";
+  _profiles = profiles || [];
   if (!_profiles.length) {
     sel.innerHTML = '<option value="">— add a subscription —</option>';
     document.getElementById("btn-switch").disabled = true;
+    _profileDraftValue = "";
+    _profileSwitchPending = false;
     return;
   }
-  sel.innerHTML = _profiles.map((p, i) =>
-    `<option value="${i}" ${p.active ? "selected" : ""}>${p.name}</option>`
+
+  const activeProfile = _profiles.find(p => p.active);
+  const activeValue = activeProfile ? profileOptionValue(activeProfile) : "";
+  const optionValues = new Set(_profiles.map(profileOptionValue));
+
+  sel.innerHTML = _profiles.map((p) =>
+    `<option value="${profileOptionValue(p)}">${p.name}</option>`
   ).join("");
+
+  const desiredValue = _profileDraftValue || currentValue;
+  if (desiredValue && optionValues.has(desiredValue) && (!_profileSwitchPending || desiredValue !== activeValue)) {
+    sel.value = desiredValue;
+  } else if (activeValue && optionValues.has(activeValue)) {
+    sel.value = activeValue;
+    _profileDraftValue = "";
+    _profileSwitchPending = false;
+  } else {
+    sel.selectedIndex = 0;
+    _profileDraftValue = sel.value || "";
+  }
+
   document.getElementById("btn-switch").disabled = false;
 }
 
@@ -827,9 +859,11 @@ async function vpnAction(action) {
 }
 
 async function switchProfile() {
-  const idx = parseInt(document.getElementById("profile-sel").value);
-  if (isNaN(idx) || !_profiles[idx]) return;
-  const p = _profiles[idx];
+  const selectedValue = document.getElementById("profile-sel").value;
+  const p = _profiles.find(p => profileOptionValue(p) === selectedValue);
+  if (!p) return;
+  _profileDraftValue = selectedValue;
+  _profileSwitchPending = true;
   document.getElementById("btn-switch").disabled = true;
   setMsg("msg", "Switching profile…");
   try {
@@ -839,8 +873,10 @@ async function switchProfile() {
     const r = await fetch(`profile/set?${params}`, {method:"POST"});
     const d = await r.json();
     setMsg("msg", d.ok ? "Profile saved. VPN restarting…" : ("Error: "+(d.error||"")), d.ok);
+    if (!d.ok) _profileSwitchPending = false;
   } catch(e) {
     setMsg("msg", "Request failed", false);
+    _profileSwitchPending = false;
   }
   setTimeout(poll, 3000);
 }
