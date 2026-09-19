@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Parse subscription URL or direct proxy URL → sing-box config JSON.
+Parse subscription URL or direct proxy URL тЖТ sing-box config JSON.
 Supports: vless://, vmess://, trojan://, ss://, hy2://, hysteria2://, tuic://
 Subscription formats: base64 list, Clash YAML.
 """
@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 import ssl
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# тФАтФА Helpers тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 def safe_b64decode(s):
     s = s.strip().replace('\n', '').replace(' ', '')
@@ -32,7 +32,7 @@ def fetch_url(url, timeout=15):
         return r.read().decode('utf-8', errors='ignore')
 
 
-# ── Protocol parsers ───────────────────────────────────────────────────────────
+# тФАтФА Protocol parsers тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 def parse_vless(url):
     """vless://uuid@host:port?params#name"""
@@ -125,12 +125,25 @@ def parse_trojan(url):
         "server": p.hostname,
         "server_port": p.port or 443,
         "password": p.username or "",
-        "tls": {
+    }
+    security = params.get("security", "")
+    if security == "reality":
+        out["tls"] = {
+            "enabled": True,
+            "server_name": params.get("sni", p.hostname),
+            "utls": {"enabled": True, "fingerprint": params.get("fp", "chrome")},
+            "reality": {
+                "enabled": True,
+                "public_key": params.get("pbk", ""),
+                "short_id": params.get("sid", ""),
+            },
+        }
+    else:
+        out["tls"] = {
             "enabled": True,
             "server_name": params.get("sni", p.hostname),
             "insecure": params.get("allowInsecure", "0") == "1",
-        },
-    }
+        }
     return name, out
 
 
@@ -229,13 +242,13 @@ def parse_proxy_url(url):
         raise ValueError(f"Unknown protocol: {url[:30]}")
 
 
-# ── Subscription parser ────────────────────────────────────────────────────────
+# тФАтФА Subscription parser тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 def parse_subscription(content):
     """Returns list of (name, outbound_dict)."""
     proxies = []
 
-    # Try base64 decode → list of proxy URLs
+    # Try base64 decode тЖТ list of proxy URLs
     try:
         decoded = safe_b64decode(content)
         if any(decoded.startswith(p) for p in ("vless://", "vmess://", "trojan://", "ss://", "hy2://", "hysteria2://", "tuic://")):
@@ -299,16 +312,18 @@ def parse_subscription(content):
     return proxies
 
 
-# ── Config builder ─────────────────────────────────────────────────────────────
+# тФАтФА Config builder тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
-def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=None):
+def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=None,
+                          direct_domains=None, default_outbound="proxy"):
     # Force the outbound tag to "proxy" so route rules work
     outbound = dict(outbound)
     outbound["tag"] = "proxy"
 
-    # Route rules: private/multicast IPs → direct (these bypass TUN via route_exclude_address
-    # but also listed here as safety). All other public traffic → proxy (VPN).
-    # Tailscale control-plane domains go direct so Tailscale works alongside the VPN.
+    # Route rules evaluated top to bottom, first match wins.
+    # Private/multicast IPs тЖТ direct (these bypass TUN via route_exclude_address
+    # but also listed here as safety). Tailscale control-plane domains go direct
+    # so Tailscale works alongside the VPN.
     route_rules = [
         {"ip_is_private": True, "outbound": "direct"},
         {
@@ -317,18 +332,21 @@ def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=Non
         },
     ]
 
-    # Route to exclude from proxy (go direct even if public): user-specified domains
-    # Note: SNI-based domain matching requires sniffing which may not always work.
-    # The final "proxy" handles everything else (Spotify, etc.) via VPN.
+    # User-specified overrides: direct_domains always bypass the VPN,
+    # proxy_domains always go through it тАФ regardless of default_outbound.
+    if direct_domains:
+        route_rules.append({"domain_suffix": direct_domains, "outbound": "direct"})
+    if proxy_domains:
+        route_rules.append({"domain_suffix": proxy_domains, "outbound": "proxy"})
 
     cfg = {
         "log": {"level": log_level, "output": ""},
         "dns": {
             "servers": [
-                {"tag": "dns-direct", "address": "8.8.8.8"},
+                {"tag": "dns-proxy", "address": "8.8.8.8", "detour": "proxy"},
             ],
-            "final": "dns-direct",
-            "strategy": "prefer_ipv4",
+            "final": "dns-proxy",
+            "strategy": "ipv4_only",
         },
         "outbounds": [
             outbound,
@@ -337,7 +355,7 @@ def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=Non
         ],
         "route": {
             "rules": route_rules,
-            "final": "proxy",
+            "final": default_outbound,
             "auto_detect_interface": True,
         },
     }
@@ -363,7 +381,11 @@ def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=Non
         cfg["inbounds"] = [{
             "type": "tun",
             "tag": "tun-in",
-            "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+            # IPv4 only: an IPv6 tun address makes the host believe it has a
+            # working IPv6 route, but this proxy/server setup does not reliably
+            # carry IPv6 traffic тАФ connections silently corrupt mid-handshake
+            # instead of failing over to IPv4 (e.g. api.telegram.org over IPv6).
+            "address": ["172.19.0.1/30"],
             "mtu": 1500,
             "auto_route": True,
             "strict_route": False,
@@ -381,7 +403,7 @@ def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=Non
     return cfg
 
 
-# ── Main ───────────────────────────────────────────────────────────────────────
+# тФАтФА Main тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 def main():
     import argparse
@@ -393,7 +415,10 @@ def main():
     ap.add_argument("--log",            default="info")
     ap.add_argument("--out",            default="/data/hiddify/config.json")
     ap.add_argument("--list",           action="store_true", help="List profiles and exit")
-    ap.add_argument("--proxy-domains",  default="", help="Comma-separated domain suffixes to route via proxy (default: all traffic)")
+    ap.add_argument("--proxy-domains",   default="", help="Comma-separated domain suffixes always routed via proxy (VPN)")
+    ap.add_argument("--direct-domains",  default="", help="Comma-separated domain suffixes always routed direct (bypass VPN)")
+    ap.add_argument("--default-outbound", default="proxy", choices=["proxy", "direct"],
+                     help="Where unmatched traffic goes (default: proxy = full tunnel)")
     args = ap.parse_args()
 
     url = args.url.strip()
@@ -413,7 +438,7 @@ def main():
 
     print(f"[parse_sub] Found {len(proxies)} profile(s):", file=sys.stderr)
     for i, (name, _) in enumerate(proxies):
-        marker = " ◄" if i == args.index else ""
+        marker = " тЧД" if i == args.index else ""
         print(f"  [{i}] {name}{marker}", file=sys.stderr)
 
     if args.list:
@@ -425,8 +450,13 @@ def main():
     name, outbound = proxies[idx]
     print(f"[parse_sub] Using profile [{idx}]: {name}", file=sys.stderr)
 
-    proxy_domains = [d.strip() for d in args.proxy_domains.split(",") if d.strip()] if args.proxy_domains else None
-    cfg = build_singbox_config(outbound, tun=args.tun, log_level=args.log, proxy_domains=proxy_domains)
+    proxy_domains  = [d.strip() for d in args.proxy_domains.split(",") if d.strip()] or None
+    direct_domains = [d.strip() for d in args.direct_domains.split(",") if d.strip()] or None
+    cfg = build_singbox_config(
+        outbound, tun=args.tun, log_level=args.log,
+        proxy_domains=proxy_domains, direct_domains=direct_domains,
+        default_outbound=args.default_outbound,
+    )
 
     import os
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
