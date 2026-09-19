@@ -314,6 +314,19 @@ def parse_subscription(content):
 
 # тФАтФА Config builder тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
+def _split_domains_and_cidrs(entries):
+    """Split a mixed list of domain suffixes and IP/CIDR literals into two lists."""
+    import ipaddress
+    names, cidrs = [], []
+    for e in entries:
+        try:
+            ipaddress.ip_network(e, strict=False)
+            cidrs.append(e)
+        except ValueError:
+            names.append(e)
+    return names, cidrs
+
+
 def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=None,
                           direct_domains=None, default_outbound="proxy"):
     # Force the outbound tag to "proxy" so route rules work
@@ -333,11 +346,23 @@ def build_singbox_config(outbound, tun=True, log_level="info", proxy_domains=Non
     ]
 
     # User-specified overrides: direct_domains always bypass the VPN,
-    # proxy_domains always go through it тАФ regardless of default_outbound.
+    # proxy_domains always go through it, regardless of default_outbound.
+    # Entries are split into domain suffixes and IP/CIDR literals, since
+    # domain_suffix only matches sniffed hostnames (unreliable for clients
+    # that don't expose a clean SNI) while ip_cidr matches the real
+    # destination address regardless of sniffing.
     if direct_domains:
-        route_rules.append({"domain_suffix": direct_domains, "outbound": "direct"})
+        d_names, d_cidrs = _split_domains_and_cidrs(direct_domains)
+        if d_names:
+            route_rules.append({"domain_suffix": d_names, "outbound": "direct"})
+        if d_cidrs:
+            route_rules.append({"ip_cidr": d_cidrs, "outbound": "direct"})
     if proxy_domains:
-        route_rules.append({"domain_suffix": proxy_domains, "outbound": "proxy"})
+        p_names, p_cidrs = _split_domains_and_cidrs(proxy_domains)
+        if p_names:
+            route_rules.append({"domain_suffix": p_names, "outbound": "proxy"})
+        if p_cidrs:
+            route_rules.append({"ip_cidr": p_cidrs, "outbound": "proxy"})
 
     cfg = {
         "log": {"level": log_level, "output": ""},
