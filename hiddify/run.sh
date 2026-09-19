@@ -14,13 +14,15 @@ HA_TOKEN="${SUPERVISOR_TOKEN:-}"
 
 mkdir -p /data/hiddify
 
-# ── Read add-on options ────────────────────────────────────────────────────────
+# тФАтФА Read add-on options тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 TUN_MODE=$(jq -r '.tun_mode // true' "$CONFIG_JSON")
 LOG_LEVEL=$(jq -r '.log_level // "info"' "$CONFIG_JSON")
 PROXY_DOMAINS=$(jq -r '.proxy_domains // ""' "$CONFIG_JSON")
+DIRECT_DOMAINS=$(jq -r '.direct_domains // ""' "$CONFIG_JSON")
+DEFAULT_OUTBOUND=$(jq -r '.default_outbound // "proxy"' "$CONFIG_JSON")
 
-# ── Import subscription_urls from HA config into subscriptions.json ────────────
+# тФАтФА Import subscription_urls from HA config into subscriptions.json тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 # Each URL in subscription_urls not yet tracked gets auto-imported with profile fetch.
 python3 << 'PYEOF'
 import json, os, subprocess
@@ -71,7 +73,7 @@ if changed:
 PYEOF
 
 # active_profile.json (written by UI) is the single source of truth.
-# If it exists → use it. Otherwise fall back to first subscription / options.json.
+# If it exists тЖТ use it. Otherwise fall back to first subscription / options.json.
 if [ -f "$ACTIVE_PROFILE_FILE" ] && [ -f "$SUBSCRIPTIONS_FILE" ]; then
     _ACTIVE_SUB_ID=$(jq -r '.sub_id // ""' "$ACTIVE_PROFILE_FILE")
     _ACTIVE_IDX=$(jq -r '.profile_index // 0' "$ACTIVE_PROFILE_FILE")
@@ -81,18 +83,18 @@ if [ -f "$ACTIVE_PROFILE_FILE" ] && [ -f "$SUBSCRIPTIONS_FILE" ]; then
         PROFILE_IDX="$_ACTIVE_IDX"
         echo "[hiddify] Active profile: sub=$_ACTIVE_SUB_ID idx=$PROFILE_IDX url=${SUB_URL:0:50}..."
     else
-        # Active sub was removed — fall back to first available
+        # Active sub was removed тАФ fall back to first available
         SUB_URL=$(jq -r '.[0].url // ""' "$SUBSCRIPTIONS_FILE" 2>/dev/null || echo "")
         PROFILE_IDX=0
         echo "[hiddify] Active sub not found, falling back to first subscription"
     fi
 elif [ -f "$SUBSCRIPTIONS_FILE" ]; then
-    # No active profile yet — use first subscription, first profile
+    # No active profile yet тАФ use first subscription, first profile
     SUB_URL=$(jq -r '.[0].url // ""' "$SUBSCRIPTIONS_FILE" 2>/dev/null || echo "")
     PROFILE_IDX=0
     echo "[hiddify] No active profile, using first subscription"
 else
-    # Legacy: no subscriptions.json → use options.json directly
+    # Legacy: no subscriptions.json тЖТ use options.json directly
     SUB_URL=$(jq -r '.subscription_url // (.subscription_urls[0] // "")' "$CONFIG_JSON")
     PROFILE_IDX=$(jq -r '.selected_profile // 0' "$CONFIG_JSON")
     echo "[hiddify] Legacy mode: url=${SUB_URL:0:50}... idx=$PROFILE_IDX"
@@ -103,7 +105,7 @@ echo "[hiddify] Subscription: ${SUB_URL:0:60}..."
 echo "[hiddify] Profile index: $PROFILE_IDX"
 echo "[hiddify] TUN mode: $TUN_MODE"
 
-# ── Validate ───────────────────────────────────────────────────────────────────
+# тФАтФА Validate тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 if [ -z "$SUB_URL" ]; then
     echo "[hiddify] ERROR: subscription_url is empty. Set it in add-on configuration."
@@ -111,7 +113,7 @@ if [ -z "$SUB_URL" ]; then
     exit 1
 fi
 
-# ── HA state helper ────────────────────────────────────────────────────────────
+# тФАтФА HA state helper тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 ha_state() {
     local status="$1"
@@ -176,7 +178,7 @@ with open(os.environ['_STATE_FILE'], 'w') as f:
 " 2>/dev/null || true
 }
 
-# ── TUN setup ──────────────────────────────────────────────────────────────────
+# тФАтФА TUN setup тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 setup_tun() {
     modprobe tun 2>/dev/null || true
@@ -188,7 +190,7 @@ setup_tun() {
     fi
 }
 
-# ── Parse subscription ─────────────────────────────────────────────────────────
+# тФАтФА Parse subscription тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 parse_config() {
     echo "[hiddify] Parsing subscription..." >&2
@@ -213,6 +215,8 @@ print(json.dumps(out))
         $TUN_FLAG \
         --log "$LOG_LEVEL" \
         --proxy-domains "$PROXY_DOMAINS" \
+        --direct-domains "$DIRECT_DOMAINS" \
+        --default-outbound "$DEFAULT_OUTBOUND" \
         --out "$HIDDIFY_CONFIG" 2>&1 | tail -1) || {
         echo "[hiddify] ERROR: Failed to parse subscription" >&2
         ha_state "error" "" "Failed to parse subscription"
@@ -224,7 +228,7 @@ print(json.dumps(out))
     echo "$PROFILE_NAME"
 }
 
-# ── Trigger HA speedtest integration ──────────────────────────────────────────
+# тФАтФА Trigger HA speedtest integration тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 trigger_speedtest() {
     if [ -n "${HA_TOKEN:-}" ]; then
@@ -237,7 +241,7 @@ trigger_speedtest() {
     fi
 }
 
-# ── Get external IP ────────────────────────────────────────────────────────────
+# тФАтФА Get external IP тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 get_ip() {
     local ip
@@ -246,7 +250,7 @@ get_ip() {
     echo "$ip"
 }
 
-# ── Monitor loop ───────────────────────────────────────────────────────────────
+# тФАтФА Monitor loop тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 monitor_loop() {
     local profile="$1"
@@ -283,7 +287,7 @@ monitor_loop() {
     done
 }
 
-# ── Cleanup ────────────────────────────────────────────────────────────────────
+# тФАтФА Cleanup тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 cleanup() {
     echo "[hiddify] Stopping..."
@@ -298,7 +302,7 @@ cleanup() {
 
 trap cleanup SIGTERM SIGINT SIGQUIT
 
-# ── Main ───────────────────────────────────────────────────────────────────────
+# тФАтФА Main тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 [ "$TUN_MODE" = "true" ] && setup_tun
 
@@ -347,7 +351,7 @@ start_singbox() {
 
 start_singbox
 
-# ── Register custom icon in HA Lovelace ───────────────────────────────────────
+# тФАтФА Register custom icon in HA Lovelace тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 mkdir -p /config/www
 cp /hiddify-icons.js /config/www/hiddify-icons.js
@@ -376,7 +380,7 @@ else:
     print(f"[hiddify] Lovelace resource already present: {url}")
 PYEOF
 
-# ── Start web dashboard ────────────────────────────────────────────────────────
+# тФАтФА Start web dashboard тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 
 echo "[hiddify] Starting web dashboard on :8080"
 WEB_PORT=8080 python3 /web_ui.py 2>&1 | while IFS= read -r line; do echo "[web] $line"; done &
@@ -390,7 +394,7 @@ WATCHDOG_PID=$!
 monitor_loop "$PROFILE_NAME" &
 MONITOR_PID=$!
 
-# ── Control loop — handles stop/start requests from web UI ────────────────────
+# тФАтФА Control loop тАФ handles stop/start requests from web UI тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
 while true; do
     # Poll every 2s for stop request or sing-box exit
     sleep 2
@@ -404,7 +408,7 @@ while true; do
         kill "$HIDDIFY_PID"  2>/dev/null || true
         wait "$HIDDIFY_PID"  2>/dev/null || true
         ip link delete tun0 2>/dev/null || true
-        ha_state "connecting" "" "Reloading profile…"
+        ha_state "connecting" "" "Reloading profileтАж"
 
         # Re-read active subscription (may have changed via UI)
         if [ -f "$ACTIVE_PROFILE_FILE" ] && [ -f "$SUBSCRIPTIONS_FILE" ]; then
