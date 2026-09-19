@@ -1,6 +1,6 @@
 name: "Hiddify VPN"
 description: "VPN client powered by sing-box. Masks all traffic via VLESS, VMess, Trojan, Hysteria2, TUIC, Reality. Add your subscription URL or proxy link."
-version: "2.4.1"
+version: "2.4.2"
 slug: "hiddify"
 init: false
 homeassistant_api: true
@@ -15,7 +15,9 @@ options:
   selected_profile: 0
   tun_mode: true
   log_level: "info"
-  proxy_domains: "spotify.com,scdn.co,spotifycdn.com"
+  default_outbound: "proxy"
+  proxy_domains: ""
+  direct_domains: ""
 
 schema:
   subscription_urls:
@@ -23,7 +25,9 @@ schema:
   selected_profile: int
   tun_mode: bool
   log_level: list(info|debug|warn|error)
+  default_outbound: list(proxy|direct)
   proxy_domains: str
+  direct_domains: str
 
 ports:
   17078/tcp: null
